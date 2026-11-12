@@ -1,0 +1,46 @@
+// ทดสอบหน้าเว็บ (jsdom) เชื่อมกับ backend จำลอง: ล็อกอิน → เพิ่มครุภัณฑ์ → ยืม → รับคืน → พิมพ์ป้าย
+const {JSDOM}=require('jsdom'),fs=require('fs'),path=require('path');
+const {call,run}=require('./mock_gas.js');
+const D=path.join(__dirname,'..','docs');
+const html=fs.readFileSync(D+'/index.html','utf8').replace(/<script src[^>]*><\/script>/g,'').replace(/<link[^>]*>/g,'');
+const dom=new JSDOM(html,{url:'https://org.github.io/elc/index.html',runScripts:'outside-only',pretendToBeVisual:true});
+const w=dom.window;
+w.fetch=(u,o)=>{const b=JSON.parse(o.body);const r=call(b.action,b.args,b.token);return Promise.resolve({ok:true,status:200,json:()=>Promise.resolve(r)})};
+w.scrollTo=()=>{};w.Element.prototype.scrollIntoView=function(){};w.confirm=()=>true;w.print=()=>{w.__printed=true};
+w.HTMLDialogElement.prototype.showModal=function(){this.open=true};w.HTMLDialogElement.prototype.close=function(){this.open=false;this.onclose&&this.onclose()};
+w.eval(fs.readFileSync(D+'/config.js','utf8').replace(/https:\/\/script\.google\.com[^']*/,'https://mock/exec'));
+w.eval(fs.readFileSync(D+'/qr.js','utf8'));w.eval(fs.readFileSync(D+'/api.js','utf8'));
+const errors=[];w.addEventListener('error',e=>errors.push(e.message));
+w.eval(fs.readFileSync(D+'/app.js','utf8'));
+const $=s=>w.document.querySelector(s),$$=s=>[...w.document.querySelectorAll(s)];
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function until(f,msg,ms=3000){const t=Date.now();while(Date.now()-t<ms){try{const v=f();if(v)return v}catch(e){}await sleep(15)}throw new Error('timeout: '+msg)}
+let pass=0,fail=0;
+const T=async(n,f)=>{try{const v=await f();pass++;console.log('PASS',n,v===undefined?'':v)}catch(e){fail++;console.log('FAIL',n,'→',e.message)}};
+const set=(sel,v)=>{const e=$(sel);e.value=v;e.dispatchEvent(new w.Event('input',{bubbles:true}))};
+const submit=f=>f.dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));
+const click=e=>e.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));
+const plus=n=>run(`addDays_(today_(),${n})`);
+(async()=>{
+await T('login screen shown',async()=>{await until(()=>$('#loginForm'),'login');return 'ok'});
+await T('wrong PIN shows error',async()=>{set('#ln','พลอย');set('#lp','bad-pin');submit($('#loginForm'));await until(()=>!$('#loginErr').hidden,'err');return $('#loginErr').textContent});
+await T('login → dashboard',async()=>{set('#lp','staff-123');submit($('#loginForm'));await until(()=>$('#view h1')&&/ภาพรวมวันนี้/.test($('#view h1').textContent),'dash');return $('.who b').textContent});
+await T('nav has 6 items & current marked',()=>{const n=$$('.nav a');if(n.length!==6)throw new Error(n.length);if(!$('.nav a[aria-current=page]'))throw new Error('no current');return 'ok'});
+await T('open add form',async()=>{w.location.hash='#/asset/new';await until(()=>$('form[data-form=asset]'),'form');return 'ok'});
+await T('submit asset (XSS name)',async()=>{set('#f-name','<img src=x onerror=window.__xss=1>เครื่องวัดความดัน');set('#f-assetNo','BP-001');set('#f-category','เครื่องวัด');set('#f-location','ห้องตรวจ');submit($('form[data-form=asset]'));await until(()=>/#\/asset\/A\d+/.test(w.location.hash),'redirect');await until(()=>$('.hd h1'),'detail');if(w.__xss)throw new Error('XSS executed');if($('.hd h1 img'))throw new Error('img injected');return $('.hd h1').textContent.slice(0,30)});
+let id;
+await T('detail shows QR svg + loan button',async()=>{id=/A\d+/.exec(w.location.hash)[0];await until(()=>$('.qrbox svg'),'qr');if(!$('a[href$="/loan"]'))throw new Error('no loan btn');return id});
+await T('QR svg decodes to scan url',()=>{const t=run(`liveAssets_(sheets_())[0].qrText`);return t});
+await T('loan form → submit',async()=>{w.location.hash='#/asset/'+id+'/loan';await until(()=>$('form[data-form=loan]'),'loan form');set('#f-borrowerName','สมชาย ใจดี');set('#f-dueDate',plus(5));submit($('form[data-form=loan]'));await until(()=>$('.hd .badge.acc')&&/ถูกยืม/.test($('.hd').textContent),'on loan');return 'on loan'});
+await T('server error surfaces in form (double loan → panel msg)',async()=>{w.location.hash='#/asset/'+id+'/loan';await until(()=>/ถูกยืมอยู่แล้ว/.test($('#slot').textContent),'msg');return 'ok'});
+await T('loans page lists it',async()=>{w.location.hash='#/loans';await until(()=>/สมชาย ใจดี/.test($('#lList').textContent),'loan row');return 'ok'});
+await T('dashboard shows on-loan count',async()=>{w.location.hash='#/';await until(()=>$('.sum'),'sum');const t=$('.sum').textContent;if(!/1\s*กำลังถูกยืม/.test(t))throw new Error(t);return t.replace(/\s+/g,' ')});
+await T('return with damage',async()=>{w.location.hash='#/asset/'+id+'/return';await until(()=>$('form[data-form=return]'),'ret form');$('input[name=damaged][value=Y]').checked=true;set('#f-ci','ขาดสายวัด');submit($('form[data-form=return]'));await until(()=>/ชำรุด/.test($('.hd .chips2').textContent),'damaged');return 'status→ชำรุด'});
+await T('assets list + filter + search',async()=>{w.location.hash='#/assets';await until(()=>$('#aList .li'),'list');click($('[data-filter=broken]'));if($$('#aList .li').length!==1)throw new Error('filter');set('#aq','zzzz');if(!/ไม่พบรายการ/.test($('#aList').textContent))throw new Error('empty');return 'ok'});
+await T('print page → print labels',async()=>{w.location.hash='#/print';await until(()=>$('#psel input'),'print list');$('#psel input').checked=true;click($('[data-do=doPrint]'));await until(()=>w.__printed,'print()',4000);if(!$('#printRoot .lb svg'))throw new Error('no label');if(!w.document.body.classList.contains('is-printing'))throw new Error('class');return $$('#printRoot .lb').length+' label'});
+await T('log page',async()=>{w.location.hash='#/log';await until(()=>/ให้ยืม|เพิ่มรายการ/.test($('#view').textContent),'log');return 'ok'});
+await T('scan page manual code → asset',async()=>{w.location.hash='#/scan';await until(()=>$('#manual'),'scan');set('#mc','BP-001');submit($('#manual'));await until(()=>/#\/asset\/A/.test(w.location.hash),'goto');return w.location.hash});
+await T('logout → login screen',async()=>{click($('.who [data-do=logout]'));await until(()=>$('#loginForm'),'login');if(w.localStorage.getItem('elc.session'))throw new Error('session kept');return 'ok'});
+await T('no JS errors',()=>{if(errors.length)throw new Error(errors.join('|'));return 'clean'});
+console.log(`\n${pass} passed, ${fail} failed`);process.exit(fail?1:0);
+})();

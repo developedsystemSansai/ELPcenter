@@ -1,0 +1,11 @@
+{
+  "name": "equipment-loan-center",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ศูนย์ยืม-คืนอุปกรณ์ / ทะเบียนครุภัณฑ์ พร้อม QR Code — frontend (GitHub Pages) + backend (Google Apps Script)",
+  "scripts": {
+    "check": "node --check docs/app.js && node --check docs/api.js && node --check docs/config.js && node --check docs/qr.js && cp backend/Code.gs /tmp/elc_code.js && node --check /tmp/elc_code.js",
+    "test": "npm run check && TZ=Asia/Bangkok node test/api_harness.js && TZ=Asia/Bangkok node test/api_harness.js strict && TZ=Asia/Bangkok node test/ui_smoke.js && TZ=Asia/Bangkok node test/scan_smoke.js"
+  },
+  "devDependencies": { "jsdom": "^24.1.0" }
+}
