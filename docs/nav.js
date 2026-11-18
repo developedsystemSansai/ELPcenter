@@ -26,7 +26,7 @@
   var href = location.href, cur = null;
   SITES.forEach(function (s) { if (href.indexOf(s.u) === 0) cur = s; });
 
-  var html = '<a class="hub" href="' + HUB + '">ศูนย์รวมระบบ รพ.สันทราย</a>', g = '';
+  var html = '', g = '';
   SITES.forEach(function (s) {
     if (s.g !== g) { g = s.g; html += '<h2>' + esc(g) + '</h2>'; }
     html += '<a class="it' + (s === cur ? ' cur' : '') + '" href="' + esc(s.u) + '"' + (s === cur ? ' aria-current="page"' : '') + '><b>' + esc(s.n) + '</b><span>' + esc(s.d) + '</span></a>';
