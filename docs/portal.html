@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ศูนย์รวมระบบ — โรงพยาบาลสันทราย</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1f2937;--ink2:#4b5563;--line:#e5e7eb;--blue:#1a56db;--blue-d:#1647b8;--blue-l:#eff4ff;--bg:#f5f7fb;color-scheme:light}
+*{box-sizing:border-box;margin:0}
+body{font:16px/1.55 'Sarabun','Noto Sans Thai',system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-text-size-adjust:100%}
+:focus-visible{outline:3px solid #f59e0b;outline-offset:2px;border-radius:10px}
+header{background:var(--blue);color:#fff;padding:32px 16px 28px}
+.in{max-width:1040px;margin:0 auto}
+h1{font-size:1.6rem;line-height:1.3}
+header p{opacity:.92;margin-top:4px}
+main{padding:24px 16px calc(48px + env(safe-area-inset-bottom))}
+h2{font-size:1rem;color:var(--ink2);margin:26px 0 10px}
+h2:first-child{margin-top:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.card{display:block;background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;color:inherit;text-decoration:none;transition:transform .18s cubic-bezier(.16,1,.3,1),box-shadow .18s,border-color .18s}
+.card:hover{transform:translateY(-2px);border-color:var(--blue);box-shadow:0 10px 24px -14px rgba(26,86,219,.55)}
+.card:active{transform:none}
+.card b{display:block;font-size:1.02rem}
+.card span{display:block;color:var(--ink2);font-size:.9rem;margin-top:2px}
+footer{max-width:1040px;margin:0 auto;padding:0 16px 32px;color:var(--ink2);font-size:.85rem}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="in"><h1>ศูนย์รวมระบบ</h1><p>โรงพยาบาลสันทราย · ทุกระบบเข้าได้จากที่นี่ และจากปุ่มเมนูมุมซ้ายล่างของแต่ละเว็บ</p></div></header>
+<main><div class="in" id="list"></div></main>
+<footer>บางระบบสำหรับเจ้าหน้าที่ ต้องเข้าสู่ระบบก่อนใช้งาน</footer>
+<script>window.SANSAI_NAV_OFF=true;</script>
+<script src="nav.js"></script>
+<script>
+(function(){
+  var esc=function(s){return String(s).replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})};
+  var h='',g='';
+  window.SANSAI_SITES.forEach(function(s){
+    if(s.g!==g){if(g)h+='</div>';g=s.g;h+='<h2>'+esc(g)+'</h2><div class="grid">'}
+    h+='<a class="card" href="'+esc(s.u)+'"><b>'+esc(s.n)+'</b><span>'+esc(s.d)+'</span></a>';
+  });
+  document.getElementById('list').innerHTML=h+'</div>';
+})();
+</script>
+</body>
+</html>
